@@ -2,7 +2,7 @@
 
 ///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 
-import {MetricsPanelCtrl} from 'app/plugins/sdk';
+import { MetricsPanelCtrl } from 'app/plugins/sdk';
 
 import _ from 'lodash';
 import moment from 'moment';
@@ -14,11 +14,12 @@ import {
   SeriesWrapperTable,
   SeriesWrapperTableRow,
 } from './SeriesWrapper';
-import {EditorHelper} from './editor';
+import { EditorHelper } from './editor';
 
-import {loadPlotly, loadIfNecessary} from './libLoader';
-import {AnnoInfo} from './anno';
-import {Axis} from 'plotly.js';
+import { loadPlotly, loadIfNecessary } from './libLoader';
+import { AnnoInfo } from './anno';
+import { Axis } from 'plotly.js';
+import { Trace } from './Trace';
 
 let Plotly: any; // Loaded dynamically!
 
@@ -81,14 +82,15 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       fixScale: '',
       traces: [PlotlyPanelCtrl.defaultTrace],
       settings: {
-        type: 'scatter',
+        type: 'bar',
         displayModeBar: false,
       },
       layout: {
-        showlegend: false,
-        legend: {
-          orientation: 'h',
-        },
+        // showlegend: false,
+        // legend: {
+        //   orientation: 'h',
+        // },
+        barmode: 'stack',
         dragmode: 'lasso', // (enumerated: "zoom" | "pan" | "select" | "lasso" | "orbit" | "turntable" )
         hovermode: 'closest',
         font: {
@@ -121,6 +123,8 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   series: SeriesWrapper[];
   seriesByKey: Map<string, SeriesWrapper> = new Map();
   seriesHash = '?';
+
+  newTraces: any[];
 
   traces: any[]; // The data sent directly to Plotly -- with a special __copy element
   layout: any; // The layout used by Plotly
@@ -207,10 +211,13 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       this.layout.width = rect.width;
       this.layout.height = this.height;
       Plotly.redraw(this.graphDiv);
+
+      console.log('redraw with layout:', this.layout);
     }
   }, 50);
 
   onResize() {
+    console.log('onResize', this.graphDiv, this.layout, Plotly, this.graphDiv && this.layout && Plotly)
     if (this.graphDiv && this.layout && Plotly) {
       this.doResize(); // Debounced
     }
@@ -412,6 +419,19 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     return layout;
   }
 
+  drawPlot() {
+    const s = this.cfg.settings;
+    const options = {
+      showLink: false,
+      displaylogo: false,
+      displayModeBar: s.displayModeBar,
+      modeBarButtonsToRemove: ['sendDataToCloud'], //, 'select2d', 'lasso2d']
+    };
+    this.layout = this.getProcessedLayout();
+
+    Plotly.react(this.graphDiv, this.newTraces, this.layout, options);
+  }
+
   onRender() {
     // ignore fetching data if another panel is in fullscreen
     if (this.otherPanelInFullscreenMode() || !this.graphDiv) {
@@ -423,22 +443,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     }
 
     if (!this.initialized) {
-      const s = this.cfg.settings;
-
-      const options = {
-        showLink: false,
-        displaylogo: false,
-        displayModeBar: s.displayModeBar,
-        modeBarButtonsToRemove: ['sendDataToCloud'], //, 'select2d', 'lasso2d']
-      };
-
-      this.layout = this.getProcessedLayout();
-      this.layout.shapes = this.annotations.shapes;
-      let traces = this.traces;
-      if (this.annotations.shapes.length > 0) {
-        traces = this.traces.concat(this.annotations.trace);
-      }
-      Plotly.react(this.graphDiv, traces, this.layout, options);
+      this.drawPlot();
 
       this.graphDiv.on('plotly_click', data => {
         if (data === undefined || data.points === undefined) {
@@ -502,7 +507,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
         min -= 1000;
         max += 1000;
 
-        const range = {from: moment.utc(min), to: moment.utc(max)};
+        const range = { from: moment.utc(min), to: moment.utc(max) };
 
         console.log('SELECTED!!!', min, max, data.points.length, range);
 
@@ -530,11 +535,59 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   _hadAnno = false;
 
   onDataReceived(dataList) {
+    console.log('datalist', dataList);
+
+    let traceDataColumn = 2;
+    let xValueColumn = 1;
+    let yValueColumn = 3;
+
+    let series = new Map<string, Trace>();
+
+    if (!dataList || dataList.length < 1) {
+      return;
+    }
+
+    dataList.forEach(dbRequestResults => {
+      if (dbRequestResults.rows && dbRequestResults.rows.length > 0)
+        dbRequestResults.rows.forEach(dbRequestRow => {
+          let traceName = dbRequestRow[traceDataColumn];
+          let traceX = dbRequestRow[xValueColumn];
+          let traceY = dbRequestRow[yValueColumn];
+
+          let trace = series.get(traceName);
+          if (!trace) {
+            trace = new Trace();
+            trace.name = traceName;
+            series.set(traceName, trace);
+          }
+
+          trace.x.push(Number(traceX));
+          trace.y.push(Number(traceY));
+        })
+    });
+
+    this.newTraces = []
+    series.forEach(serie => {
+      this.newTraces.push({
+        x: serie.x,
+        y: serie.y,
+        type: 'bar',
+        name: serie.name
+      })
+    })
+
+    console.log("DATAROWS", this.newTraces);
+    this.drawPlot();
+
     const finfo: SeriesWrapper[] = [];
     let seriesHash = '/';
     if (dataList && dataList.length > 0) {
       const useRefID = dataList.length === this.panel.targets.length;
       dataList.forEach((series, sidx) => {
+
+        console.log('for each: series', series);
+        console.log('for each: sidx', sidx);
+
         let refId = '';
         if (useRefID) {
           refId = _.get(this.panel, 'targets[' + sidx + '].refId');
@@ -564,6 +617,9 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       });
     });
     this.series = finfo;
+
+    console.log('seriesByKey', this.seriesByKey);
+    console.log('series', this.series);
 
     // Now Process the loaded data
     const hchanged = this.seriesHash !== seriesHash;
@@ -645,7 +701,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       const trace: any = {
         name: config.name || EditorHelper.createTraceName(idx),
         type: this.cfg.settings.type,
-        mode: 'markers+lines', // really depends on config settings
+        // mode: 'markers+lines', // really depends on config settings
         __set: [], // { key:? property:? }
       };
 
@@ -700,9 +756,9 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     } else if (this.traces.length !== this.cfg.traces.length) {
       console.log(
         'trace number mismatch.  Found: ' +
-          this.traces.length +
-          ', expect: ' +
-          this.cfg.traces.length
+        this.traces.length +
+        ', expect: ' +
+        this.cfg.traces.length
       );
       this._updateTracesFromConfigs();
     }
@@ -761,21 +817,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
           this.annotations.clear();
         }
 
-        const s = this.cfg.settings;
-        const options = {
-          showLink: false,
-          displaylogo: false,
-          displayModeBar: s.displayModeBar,
-          modeBarButtonsToRemove: ['sendDataToCloud'], //, 'select2d', 'lasso2d']
-        };
-        this.layout = this.getProcessedLayout();
-        this.layout.shapes = this.annotations.shapes;
-        let traces = this.traces;
-        if (this.annotations.shapes.length > 0) {
-          traces = this.traces.concat(this.annotations.trace);
-        }
-        console.log('ConfigChanged (traces)', traces);
-        Plotly.react(this.graphDiv, traces, this.layout, options);
+        this.drawPlot();
       }
 
       this.render(); // does not query again!
@@ -798,4 +840,4 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   }
 }
 
-export {PlotlyPanelCtrl, PlotlyPanelCtrl as PanelCtrl};
+export { PlotlyPanelCtrl, PlotlyPanelCtrl as PanelCtrl };
