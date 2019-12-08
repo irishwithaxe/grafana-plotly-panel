@@ -3,7 +3,7 @@
   "version": "0.0.8",
   "description": "Plot.ly Panel Plugin for Grafana",
   "scripts": {
-    "build-and-copy": "yarn build && sudo cp -r dist/ ../beam/metrics2.0/grafana/data/plugins/grafana_plotly_plugin && echo \"\" && echo \"copied into grafana_plotly_plugin\"",
+    "build-and-copy": "yarn build && cp -r dist/ ../beam/metrics2.0/grafana/data/plugins/grafana_plotly_plugin && echo \"\" && echo \"copied into grafana_plotly_plugin\"",
     "build": "webpack --config webpack.config.prod.js",
     "dev": "webpack --mode development",
     "watch": "webpack --mode development --watch",

@@ -17,7 +17,10 @@
       },
       "hovermode": "closest",
       "legend": {
-        "orientation": "v"
+        "orientation": "h",
+        "traceorder": "normal",
+        "x": 0,
+        "y":-0.4
       },
       "margin": {
         "b": 45,

@@ -83,15 +83,22 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       traces: [PlotlyPanelCtrl.defaultTrace],
       settings: {
         type: 'bar',
+        fill: 'None',
+        mode: 'None',
         displayModeBar: false,
       },
+      dataColumnNames: {
+        dataColumn: '?',
+        xColumn: '?',
+        yColumn: '?'
+      },
       layout: {
-        // showlegend: false,
-        // legend: {
-        //   orientation: 'h',
-        // },
+        showlegend: false,
+        legend: {
+          orientation: 'h',
+        },
         barmode: 'stack',
-        dragmode: 'lasso', // (enumerated: "zoom" | "pan" | "select" | "lasso" | "orbit" | "turntable" )
+        dragmode: 'zoom', // (enumerated: "zoom" | "pan" | "select" | "lasso" | "orbit" | "turntable" )
         hovermode: 'closest',
         font: {
           family: '"Open Sans", Helvetica, Arial, sans-serif',
@@ -124,6 +131,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   seriesByKey: Map<string, SeriesWrapper> = new Map();
   seriesHash = '?';
 
+  dataColumns: any[];
   newTraces: any[];
 
   traces: any[]; // The data sent directly to Plotly -- with a special __copy element
@@ -148,6 +156,8 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     super($scope, $injector);
 
     this.initialized = false;
+
+    this.dataColumns = ["test1", "test2", "ahahahahaha"]
 
     //this.$tooltip = $('<div id="tooltip" class="graph-tooltip">');
 
@@ -534,25 +544,64 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   _hadAnno = false;
 
-  onDataReceived(dataList) {
-    console.log('datalist', dataList);
+  compareForArrays
 
-    let traceDataColumn = 2;
-    let xValueColumn = 1;
-    let yValueColumn = 3;
+  onDataReceived(dataList) {
+    console.log('whole datalist', dataList);
 
     let series = new Map<string, Trace>();
+    this.newTraces = []
 
     if (!dataList || dataList.length < 1) {
       return;
     }
 
     dataList.forEach(dbRequestResults => {
-      if (dbRequestResults.rows && dbRequestResults.rows.length > 0)
-        dbRequestResults.rows.forEach(dbRequestRow => {
+      console.log('datalist item', dbRequestResults);
+
+      if (dbRequestResults.rows && dbRequestResults.rows.length > 0) {
+        let traceDataColumn = 2;
+        let xValueColumn = 1;
+        let yValueColumn = 3;
+
+        dbRequestResults.columns.forEach((row, index) => {
+          if (row.text == this.cfg.dataColumnNames.xColumn) {
+            xValueColumn = index
+          }
+          if (row.text == this.cfg.dataColumnNames.yColumn) {
+            yValueColumn = index
+          }
+          if (row.text == this.cfg.dataColumnNames.dataColumn) {
+            traceDataColumn = index
+          }
+        })
+
+        this.cfg.dataColumnNames.all = dbRequestResults.columns.map(r => r.text).join(' ')
+
+        let sortedRows = dbRequestResults.rows.sort((obj1, obj2) => {
+          let obj1order: number = Number(obj1[xValueColumn])
+          let obj2order: number = Number(obj2[xValueColumn])
+
+          if (obj1order > obj2order) {
+            return 1;
+          }
+
+          if (obj1order < obj2order) {
+            return -1;
+          }
+
+          return 0;
+        });
+
+        sortedRows.forEach(dbRequestRow => {
           let traceName = dbRequestRow[traceDataColumn];
-          let traceX = dbRequestRow[xValueColumn];
-          let traceY = dbRequestRow[yValueColumn];
+          let traceX: number = Number(dbRequestRow[xValueColumn]);
+          let traceY: number = Number(dbRequestRow[yValueColumn]);
+
+          if (this.cfg.dataColumnNames.xColumn == 'Time') {
+            let xdate = new Date(dbRequestRow[xValueColumn])
+            traceX = xdate.getHours()
+          }
 
           let trace = series.get(traceName);
           if (!trace) {
@@ -561,22 +610,60 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
             series.set(traceName, trace);
           }
 
-          trace.x.push(Number(traceX));
-          trace.y.push(Number(traceY));
+          // to keep order
+          let prevTraceX: number = trace.x[trace.x.length - 1];
+          if (traceX <= prevTraceX) {
+            traceX = prevTraceX + 1;
+          }
+
+          trace.x.push(traceX);
+          trace.y.push(traceY);
         })
+      }
     });
 
     this.newTraces = []
     series.forEach(serie => {
+      console.log('serie', serie)
+      let xVals = serie.x.map(String)
+      let yVals = serie.y
+
+      if (this.cfg.dataColumnNames.xColumn == 'Time') {
+        if (serie.x[0] != 0) {
+          if (serie.x[0] != 1) {
+            xVals.unshift((serie.x[0] - 1).toString())
+            yVals.unshift(0)
+          }
+
+          xVals.unshift('0')
+          yVals.unshift(0)
+        }
+
+        if (serie.x[serie.x.length - 1] < 24) {
+          if (serie.x[serie.x.length - 1] < 23) {
+            xVals.push((serie.x[serie.x.length - 1] + 1).toString())
+            yVals.push(0)
+          }
+
+          xVals.push('24')
+          yVals.push(0)
+        }
+      }
+
       this.newTraces.push({
-        x: serie.x,
-        y: serie.y,
-        type: 'bar',
+        x: xVals,
+        y: yVals,
+        type: this.cfg.settings.type,
+        mode: this.cfg.settings.mode,
+        fill: this.cfg.settings.fill,
+        // text: hover text
+        // https://plot.ly/~alex/455/four-ways-to-change-opacity-of-scatter-markers.embed
+        // fillcolor: 'rgba(26, 150, 65, 0.4)',
         name: serie.name
       })
     })
 
-    console.log("DATAROWS", this.newTraces);
+    console.log("traces", this.newTraces);
     this.drawPlot();
 
     const finfo: SeriesWrapper[] = [];
@@ -584,9 +671,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     if (dataList && dataList.length > 0) {
       const useRefID = dataList.length === this.panel.targets.length;
       dataList.forEach((series, sidx) => {
-
-        console.log('for each: series', series);
-        console.log('for each: sidx', sidx);
 
         let refId = '';
         if (useRefID) {
@@ -617,9 +701,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       });
     });
     this.series = finfo;
-
-    console.log('seriesByKey', this.seriesByKey);
-    console.log('series', this.series);
 
     // Now Process the loaded data
     const hchanged = this.seriesHash !== seriesHash;

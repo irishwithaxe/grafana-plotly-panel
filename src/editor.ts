@@ -1,6 +1,6 @@
 import _ from 'lodash';
 
-import {PlotlyPanelCtrl} from './module';
+import { PlotlyPanelCtrl } from './module';
 
 class AxisInfo {
   label: string;
@@ -232,6 +232,23 @@ export class EditorHelper {
   // SERIES
   //-----------------------------------------------------------------------
 
+  getDataColumns(): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      let options: any[] = [];
+
+      this.ctrl.dataColumns.forEach(dataColumn => {
+        options.push(
+          this.ctrl.uiSegmentSrv.newSegment({
+            value: dataColumn
+          })
+        )
+      })
+
+      console.log("options", options);
+      resolve(options);
+    })
+  }
+
   getSeriesSegs(withRemove = false): Promise<any[]> {
     return new Promise((resolve, reject) => {
       const series: any[] = [];
@@ -254,8 +271,7 @@ export class EditorHelper {
         );
       });
 
-      //console.log('GET Segments:', withRemove, series);
-      //console.log('ALL Series:', this.ctrl.series);
+      console.log("series", series);
       resolve(series);
     });
   }
