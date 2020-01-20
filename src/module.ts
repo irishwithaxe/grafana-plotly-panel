@@ -20,6 +20,7 @@ import { loadPlotly, loadIfNecessary } from './libLoader';
 import { AnnoInfo } from './anno';
 import { Axis } from 'plotly.js';
 import { Trace } from './Trace';
+import { dataTransformator } from './dataTransformator';
 
 let Plotly: any; // Loaded dynamically!
 
@@ -544,111 +545,26 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   _hadAnno = false;
 
-  compareForArrays
+  //compareForArrays
 
   onDataReceived(dataList) {
-    console.log('whole datalist', dataList);
-
-    let series = new Map<string, Trace>();
     this.newTraces = []
-
     if (!dataList || dataList.length < 1) {
+      console.log('data is empty:', dataList);
       return;
     }
 
-    dataList.forEach(dbRequestResults => {
-      console.log('datalist item', dbRequestResults);
+    let { sortedSeries, allColumnNames } = dataTransformator.toTraces(dataList, this.cfg.dataColumnNames)
 
-      if (dbRequestResults.rows && dbRequestResults.rows.length > 0) {
-        let traceDataColumn = 2;
-        let xValueColumn = 1;
-        let yValueColumn = 3;
+    this.cfg.dataColumnNames.all = allColumnNames
 
-        dbRequestResults.columns.forEach((row, index) => {
-          if (row.text == this.cfg.dataColumnNames.xColumn) {
-            xValueColumn = index
-          }
-          if (row.text == this.cfg.dataColumnNames.yColumn) {
-            yValueColumn = index
-          }
-          if (row.text == this.cfg.dataColumnNames.dataColumn) {
-            traceDataColumn = index
-          }
-        })
+    console.log('series', sortedSeries);
+    console.log('allcolumns', allColumnNames);
 
-        this.cfg.dataColumnNames.all = dbRequestResults.columns.map(r => r.text).join(' ')
-
-        let sortedRows = dbRequestResults.rows.sort((obj1, obj2) => {
-          let obj1order: number = Number(obj1[xValueColumn])
-          let obj2order: number = Number(obj2[xValueColumn])
-
-          if (obj1order > obj2order) {
-            return 1;
-          }
-
-          if (obj1order < obj2order) {
-            return -1;
-          }
-
-          return 0;
-        });
-
-        sortedRows.forEach(dbRequestRow => {
-          let traceName = dbRequestRow[traceDataColumn];
-          let traceX: number = Number(dbRequestRow[xValueColumn]);
-          let traceY: number = Number(dbRequestRow[yValueColumn]);
-
-          if (this.cfg.dataColumnNames.xColumn == 'Time') {
-            let xdate = new Date(dbRequestRow[xValueColumn])
-            traceX = xdate.getHours()
-          }
-
-          let trace = series.get(traceName);
-          if (!trace) {
-            trace = new Trace();
-            trace.name = traceName;
-            series.set(traceName, trace);
-          }
-
-          // to keep order
-          let prevTraceX: number = trace.x[trace.x.length - 1];
-          if (traceX <= prevTraceX) {
-            traceX = prevTraceX + 1;
-          }
-
-          trace.x.push(traceX);
-          trace.y.push(traceY);
-        })
-      }
-    });
-
-    this.newTraces = []
-    series.forEach(serie => {
+    sortedSeries.forEach((serie: Trace) => {
       console.log('serie', serie)
       let xVals = serie.x.map(String)
       let yVals = serie.y
-
-      if (this.cfg.dataColumnNames.xColumn == 'Time') {
-        if (serie.x[0] != 0) {
-          if (serie.x[0] != 1) {
-            xVals.unshift((serie.x[0] - 1).toString())
-            yVals.unshift(0)
-          }
-
-          xVals.unshift('0')
-          yVals.unshift(0)
-        }
-
-        if (serie.x[serie.x.length - 1] < 24) {
-          if (serie.x[serie.x.length - 1] < 23) {
-            xVals.push((serie.x[serie.x.length - 1] + 1).toString())
-            yVals.push(0)
-          }
-
-          xVals.push('24')
-          yVals.push(0)
-        }
-      }
 
       this.newTraces.push({
         x: xVals,
@@ -664,7 +580,11 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     })
 
     console.log("traces", this.newTraces);
+    // this.onConfigChanged();
+    // this.render();
+
     this.drawPlot();
+    // return;
 
     const finfo: SeriesWrapper[] = [];
     let seriesHash = '/';
