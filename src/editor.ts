@@ -1,6 +1,7 @@
 import _ from 'lodash';
 
 import { PlotlyPanelCtrl } from './module';
+import { defaultValues } from './defaultValues';
 
 class AxisInfo {
   label: string;
@@ -39,7 +40,7 @@ export class EditorHelper {
 
     let changed = false;
     ctrl.cfg.traces.forEach(trace => {
-      _.defaults(trace, PlotlyPanelCtrl.defaultTrace);
+      _.defaults(trace, defaultValues.defaultTrace);
       const mapping = trace.mapping;
       if (!mapping.color) {
         mapping.color = defaultMappings.first;
@@ -127,7 +128,7 @@ export class EditorHelper {
   selectTrace(index: number) {
     this.traces = this.ctrl.cfg.traces;
     if (!this.traces || this.traces.length < 1) {
-      this.traces = this.ctrl.cfg.traces = [_.deepClone(PlotlyPanelCtrl.defaultTrace)];
+      this.traces = this.ctrl.cfg.traces = [_.deepClone(defaultValues.defaultTrace)];
     }
     if (index >= this.ctrl.cfg.traces.length) {
       index = this.ctrl.cfg.traces.length - 1;
@@ -135,7 +136,7 @@ export class EditorHelper {
     this.trace = this.ctrl.cfg.traces[index];
     this.traceIndex = index;
 
-    _.defaults(this.trace, PlotlyPanelCtrl.defaultTrace);
+    _.defaults(this.trace, defaultValues.defaultTrace);
     if (!this.trace.name) {
       this.trace.name = EditorHelper.createTraceName(index);
     }
@@ -193,7 +194,7 @@ export class EditorHelper {
     if (this.ctrl.cfg.traces.length > 0) {
       trace = _.cloneDeep(this.ctrl.cfg.traces[this.ctrl.cfg.traces.length - 1]);
     } else {
-      trace = _.deepClone(PlotlyPanelCtrl.defaultTrace);
+      trace = _.deepClone(defaultValues.defaultTrace);
     }
     trace.name = EditorHelper.createTraceName(this.ctrl.traces.length);
     this.ctrl.cfg.traces.push(trace);
@@ -214,7 +215,7 @@ export class EditorHelper {
           i = this.traces.length - 1;
         }
         this.ctrl.onConfigChanged();
-        this.ctrl._updateTraceData(true);
+        // this.ctrl._updateTraceData(true);
         this.selectTrace(i);
         this.ctrl.refresh();
         return;
@@ -231,23 +232,6 @@ export class EditorHelper {
   //-----------------------------------------------------------------------
   // SERIES
   //-----------------------------------------------------------------------
-
-  getDataColumns(): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      let options: any[] = [];
-
-      this.ctrl.dataColumns.forEach(dataColumn => {
-        options.push(
-          this.ctrl.uiSegmentSrv.newSegment({
-            value: dataColumn
-          })
-        )
-      })
-
-      console.log("options", options);
-      resolve(options);
-    })
-  }
 
   getSeriesSegs(withRemove = false): Promise<any[]> {
     return new Promise((resolve, reject) => {

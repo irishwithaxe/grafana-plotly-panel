@@ -1,0 +1,31 @@
+<div ng-if="ctrl.dataWarnings" style="margin-bottom:20px;">
+    <div ng-repeat="warn in ctrl.dataWarnings" style="margin-bottom:3px; padding:5px; border:1px solid red;">
+        {{warn}}
+    </div>
+</div>
+
+<div class="edit-tab-with-sidemenu">
+    <aside class="edit-sidemenu-aside" style="min-width: 100px">
+        <ul class="edit-sidemenu">
+            <li ng-repeat="trace in ctrl.traces" ng-class="{ active: ctrl.editor.traceIndex === $index }">
+                <a ng-click="ctrl.editor.selectTrace( $index )">{{ trace.name }}</a>
+            </li>
+            <li>
+                <!-- TODO: Better move style to CSS file -->
+                <button class="btn btn-success" ng-click="ctrl.editor.createTrace();"
+                    style="margin-bottom: 5px; width: 100%">
+                    <i class="fa fa-plus" /> Add new
+                </button>
+            </li>
+            <li>
+                <button class="btn btn-danger" ng-click="ctrl.editor.removeCurrentTrace();"
+                    ng-if="ctrl.traces.length > 1" style="width: 100%">
+                    <i class="fa fa-trash" /> Delete
+                </button>
+            </li>
+        </ul>
+    </aside>
+
+    <div class="edit-tab-content">
+    </div>
+</div>

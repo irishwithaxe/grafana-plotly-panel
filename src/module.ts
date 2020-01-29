@@ -5,7 +5,6 @@
 import { MetricsPanelCtrl } from 'app/plugins/sdk';
 
 import _ from 'lodash';
-import moment from 'moment';
 import $ from 'jquery';
 
 import {
@@ -21,6 +20,7 @@ import { AnnoInfo } from './anno';
 import { Axis } from 'plotly.js';
 import { Trace } from './Trace';
 import { dataTransformator } from './dataTransformator';
+import { defaultValues } from './defaultValues';
 
 let Plotly: any; // Loaded dynamically!
 
@@ -31,44 +31,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   initialized: boolean;
   //$tooltip: any;
 
-  static defaultTrace = {
-    mapping: {
-      x: null,
-      y: null,
-      z: null,
-      text: null,
-      color: null,
-      size: null,
-    },
-    show: {
-      line: true,
-      markers: true,
-    },
-    settings: {
-      line: {
-        color: '#005f81',
-        width: 6,
-        dash: 'solid',
-        shape: 'linear',
-      },
-      marker: {
-        size: 15,
-        symbol: 'circle',
-        color: '#33B5E5',
-        colorscale: 'YlOrRd',
-        sizemode: 'diameter',
-        sizemin: 3,
-        sizeref: 0.2,
-        line: {
-          color: '#DDD',
-          width: 0,
-        },
-        showscale: false,
-      },
-      color_option: 'ramp',
-    },
-  };
-
   static yaxis2: Partial<Axis> = {
     title: 'Annotations',
     type: 'linear',
@@ -76,57 +38,12 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     visible: false,
   };
 
-  static defaults = {
-    pconfig: {
-      loadFromCDN: false,
-      showAnnotations: true,
-      fixScale: '',
-      traces: [PlotlyPanelCtrl.defaultTrace],
-      settings: {
-        type: 'bar',
-        fill: 'None',
-        mode: 'None',
-        displayModeBar: false,
-      },
-      dataColumnNames: {
-        dataColumn: '?',
-        xColumn: '?',
-        yColumn: '?'
-      },
-      layout: {
-        showlegend: false,
-        legend: {
-          orientation: 'h',
-        },
-        barmode: 'stack',
-        dragmode: 'zoom', // (enumerated: "zoom" | "pan" | "select" | "lasso" | "orbit" | "turntable" )
-        hovermode: 'closest',
-        font: {
-          family: '"Open Sans", Helvetica, Arial, sans-serif',
-        },
-        xaxis: {
-          showgrid: true,
-          zeroline: false,
-          type: 'auto',
-          rangemode: 'normal', // (enumerated: "normal" | "tozero" | "nonnegative" )
-        },
-        yaxis: {
-          showgrid: true,
-          zeroline: false,
-          type: 'linear',
-          rangemode: 'normal', // (enumerated: "normal" | "tozero" | "nonnegative" ),
-        },
-        zaxis: {
-          showgrid: true,
-          zeroline: false,
-          type: 'linear',
-          rangemode: 'normal', // (enumerated: "normal" | "tozero" | "nonnegative" )
-        },
-      },
-    },
-  };
+  defaultPanelConfigs: any = defaultValues.defaultConfig;
 
   graphDiv: any;
+  selectorDiv: any;
+  selectorSelect: any;
+  dataList: any[] = [];
   annotations = new AnnoInfo();
   series: SeriesWrapper[];
   seriesByKey: Map<string, SeriesWrapper> = new Map();
@@ -134,6 +51,8 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   dataColumns: any[];
   newTraces: any[];
+
+  queriesDescriptions: any;
 
   traces: any[]; // The data sent directly to Plotly -- with a special __copy element
   layout: any; // The layout used by Plotly
@@ -150,7 +69,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     $scope,
     $injector,
     $window,
-    private $rootScope,
+    // private $rootScope,
     public uiSegmentSrv,
     private annotationsSrv
   ) {
@@ -158,16 +77,13 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
     this.initialized = false;
 
-    this.dataColumns = ["test1", "test2", "ahahahahaha"]
-
-    //this.$tooltip = $('<div id="tooltip" class="graph-tooltip">');
-
     // defaults configs
-    _.defaultsDeep(this.panel, PlotlyPanelCtrl.defaults);
+    _.defaultsDeep(this.panel, this.defaultPanelConfigs);
 
     this.cfg = this.panel.pconfig;
 
     this.traces = [];
+    this.queriesDescriptions = this.defaultPanelConfigs.pconfig.queriesDescription;
 
     // ?? This seems needed for tests?!!
     if (!this.events) {
@@ -304,7 +220,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     if (!this.panel.version || PlotlyPanelCtrl.configVersion > this.panel.version) {
       this.processConfigMigration();
     }
-    this._updateTraceData(true);
+    // this._updateTraceData(true);
   }
 
   deepCopyWithTemplates = obj => {
@@ -325,6 +241,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   getProcessedLayout() {
     // Copy from config
     const layout = this.deepCopyWithTemplates(this.cfg.layout);
+
     layout.plot_bgcolor = 'transparent';
     layout.paper_bgcolor = layout.plot_bgcolor;
 
@@ -354,79 +271,69 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       }
     }
 
-    if (this.is3d()) {
-      if (!layout.zaxis) {
-        layout.zaxis = {};
+    layout.margin = {
+      l: layout.yaxis.title ? 50 : 35,
+      r: 5,
+      t: 0,
+      b: layout.xaxis.title ? 65 : 30,
+      pad: 2,
+    };
+
+    // get the css rule of grafana graph axis text
+    const labelStyle = this.getCssRule('div.flot-text');
+    if (labelStyle) {
+      let color = labelStyle.style.color;
+      if (!layout.font) {
+        layout.font = {};
       }
+      layout.font.color = color;
 
-      // 3d uses 'scene' for the axis
-      layout.scene = {
-        xaxis: layout.xaxis,
-        yaxis: layout.yaxis,
-        zaxis: layout.zaxis,
-      };
+      // make the grid a little more transparent
+      color = $.color
+        .parse(color)
+        .scale('a', 0.22)
+        .toString();
 
-      delete layout.xaxis;
-      delete layout.yaxis;
-      delete layout.zaxis;
-
-      layout.margin = {
-        l: 0,
-        r: 0,
-        t: 0,
-        b: 5,
-        pad: 0,
-      };
-    } else {
-      delete layout.zaxis;
-      delete layout.scene;
-
-      // Check if the X axis should be a date
-      if (!layout.xaxis.type || layout.xaxis.type === 'auto') {
-        const mapping = _.get(this.cfg, 'traces[0].mapping.x');
-        if (mapping && mapping.indexOf('time') >= 0) {
-          layout.xaxis.type = 'date';
-        }
-      }
-
-      const isDate = layout.xaxis.type === 'date';
-      layout.margin = {
-        l: layout.yaxis.title ? 50 : 35,
-        r: 5,
-        t: 0,
-        b: layout.xaxis.title ? 65 : isDate ? 40 : 30,
-        pad: 2,
-      };
-
-      // Set the range to the query window
-      if (isDate && !layout.xaxis.range) {
-        const range = this.timeSrv.timeRange();
-        layout.xaxis.range = [range.from.valueOf(), range.to.valueOf()];
-      }
-
-      // get the css rule of grafana graph axis text
-      const labelStyle = this.getCssRule('div.flot-text');
-      if (labelStyle) {
-        let color = labelStyle.style.color;
-        if (!layout.font) {
-          layout.font = {};
-        }
-        layout.font.color = color;
-
-        // make the grid a little more transparent
-        color = $.color
-          .parse(color)
-          .scale('a', 0.22)
-          .toString();
-
-        // set gridcolor (like grafana graph)
-        layout.xaxis.gridcolor = color;
-        layout.yaxis.gridcolor = color;
-      }
-
-      // Set the second axis
-      layout.yaxis2 = PlotlyPanelCtrl.yaxis2;
+      // set gridcolor (like grafana graph)
+      layout.xaxis.gridcolor = color;
+      layout.yaxis.gridcolor = color;
     }
+
+    // for scattermapbox: display two plots instead of one
+    // one plot is bars and another is scattermapbox
+    if (this.cfg.settings.type === 'scattermapbox') {
+      layout.mapbox = {
+        domain: {
+          x: [0, 1],
+          y: [0, 0.8]
+        },
+        center: { lon: -122.4, lat: 37.75 },
+        style: "open-street-map",
+        zoom: 11
+      }
+      layout.xaxis.domain = [0, 1]
+      layout.yaxis.domain = [0.85, 1]
+    }
+
+    // Set the second axis
+    // layout.yaxis2 = PlotlyPanelCtrl.yaxis2;
+    delete layout.scene;
+    delete layout.zaxis;
+    delete layout.xaxis.range;
+    delete layout.yaxis.range;
+
+    let oldLayout = this.graphDiv.layout
+    if (oldLayout && oldLayout.mapbox && oldLayout.mapbox.center) {
+      layout.mapbox.center = oldLayout.mapbox.center
+      layout.mapbox.zoom = oldLayout.mapbox.zoom
+    }
+    if (oldLayout && oldLayout.xaxis && oldLayout.yaxis && oldLayout.xaxis.range && oldLayout.yaxis.range) {
+      layout.xaxis.range = oldLayout.xaxis.range
+      layout.yaxis.range = oldLayout.yaxis.range
+    }
+
+    //let oldData = this.graphDiv.data    
+
     return layout;
   }
 
@@ -435,12 +342,26 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     const options = {
       showLink: false,
       displaylogo: false,
+      scrollZoom: true,
       displayModeBar: s.displayModeBar,
-      modeBarButtonsToRemove: ['sendDataToCloud'], //, 'select2d', 'lasso2d']
+      modeBarButtonsToRemove: ['sendDataToCloud'], //, 'select2d', 'pan2d', 'lasso2d']
     };
+
     this.layout = this.getProcessedLayout();
 
+    console.log("draw plot with", 'data', this.newTraces, 'layout', this.layout, 'options', options);
     Plotly.react(this.graphDiv, this.newTraces, this.layout, options);
+  }
+
+  onPointsSelected(data) {
+    if (!data || !data.points || !data.points.length || data.points[0].data.type != 'bar') {
+      return;
+    }
+
+    var timesHash = {}
+    data.points.forEach(p => timesHash[p.x] = true)
+
+    this.displaySelectedQuery(time => time in timesHash)
   }
 
   onRender() {
@@ -460,77 +381,20 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
         if (data === undefined || data.points === undefined) {
           return;
         }
-        for (let i = 0; i < data.points.length; i++) {
-          const idx = data.points[i].pointNumber;
-          const ts = this.traces[0].ts[idx];
-          // console.log( 'CLICK!!!', ts, data );
-          const msg = data.points[i].x.toPrecision(4) + ', ' + data.points[i].y.toPrecision(4);
-          this.$rootScope.appEvent('alert-success', [
-            msg,
-            '@ ' + this.dashboard.formatDate(moment(ts)),
-          ]);
-        }
+
+        this.onPointsSelected(data);
+        console.log('on click', data);
       });
-
-      // if(true) {
-      //   this.graphDiv.on('plotly_hover', (data, xxx) => {
-      //     console.log( 'HOVER!!!', data, xxx, this.mouse );
-      //     if(data.points.length>0) {
-      //       var idx = 0;
-      //       var pt = data.points[idx];
-
-      //       var body = '<div class="graph-tooltip-time">'+ pt.pointNumber +'</div>';
-      //       body += "<center>";
-      //       body += pt.x + ', '+pt.y;
-      //       body += "</center>";
-
-      //       //this.$tooltip.html( body ).place_tt( this.mouse.pageX + 10, this.mouse.pageY );
-      //     }
-      //   }).on('plotly_unhover', (data) => {
-      //     //this.$tooltip.detach();
-      //   });
-      // }
 
       this.graphDiv.on('plotly_selected', data => {
         if (data === undefined || data.points === undefined) {
           return;
         }
 
-        if (data.points.length === 0) {
-          console.log('Nothing Selected', data);
-          return;
-        }
-
-        console.log('SELECTED', data);
-
-        let min = Number.MAX_SAFE_INTEGER;
-        let max = Number.MIN_SAFE_INTEGER;
-
-        for (let i = 0; i < data.points.length; i++) {
-          const found = data.points[i];
-          const idx = found.pointNumber;
-          const ts = found.fullData.x[idx];
-          min = Math.min(min, ts);
-          max = Math.max(max, ts);
-        }
-
-        // At least 2 seconds
-        min -= 1000;
-        max += 1000;
-
-        const range = { from: moment.utc(min), to: moment.utc(max) };
-
-        console.log('SELECTED!!!', min, max, data.points.length, range);
-
-        this.timeSrv.setTime(range);
-
-        // rebuild the graph after query
-        if (this.graphDiv) {
-          Plotly.Plots.purge(this.graphDiv);
-          this.graphDiv.innerHTML = '';
-          this.initialized = false;
-        }
+        this.onPointsSelected(data);
+        console.log('on select', data);
       });
+
       this.initialized = true;
     } else if (this.initialized) {
       Plotly.redraw(this.graphDiv);
@@ -545,45 +409,103 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   _hadAnno = false;
 
-  //compareForArrays
+  displaySelectedQuery(timeFilter) {
+    this.newTraces = []
+
+    var dataRowIndex = 0
+    var columnNames = this.cfg.dataColumnNames
+    if (this.queriesDescriptions.length > 1) {
+      dataRowIndex = Number(this.selectorSelect.options[this.selectorSelect.selectedIndex].value)
+
+      if (Number.isNaN(dataRowIndex)) {
+        dataRowIndex = 0;
+      }
+
+      this.queriesDescriptions.forEach(element => {
+        let queryNumber: number = Number(element.queryNumber)
+        if (queryNumber == dataRowIndex) {
+          columnNames = element.dataColumnNames
+        }
+      });
+    }
+
+    let dataRow = this.dataList[dataRowIndex]
+
+    if (!dataRow || !columnNames) {
+      console.log("no data, nothing to display")
+      return;
+    }
+
+    let graphType = this.cfg.settings.type;
+    if (graphType === 'scatter' || graphType === 'bar' || graphType === 'histogram') {
+      let { sortedSeries, allColumnNames } = dataTransformator.toTraces(dataRow, columnNames)
+
+      this.cfg.dataColumnNames.all = allColumnNames
+
+      sortedSeries.forEach((serie: Trace) => {
+        let xVals = serie.x.map(String)
+        let yVals = serie.y
+
+        this.newTraces.push({
+          x: xVals,
+          y: yVals,
+          type: this.cfg.settings.type,
+          mode: this.cfg.settings.mode,
+          fill: this.cfg.settings.fill,
+          // text: hover text
+          // https://plot.ly/~alex/455/four-ways-to-change-opacity-of-scatter-markers.embed
+          // fillcolor: 'rgba(26, 150, 65, 0.4)',
+          name: serie.name
+        })
+      })
+    } else if (graphType === 'scattermapbox') {
+      let { lat, lon, data, X, Yselected, Yhidden, allColumnNames } = dataTransformator.toLatLonDataObject(dataRow, columnNames, timeFilter)
+
+      this.cfg.dataColumnNames.all = allColumnNames
+
+      this.newTraces.push({
+        x: X,
+        y: Yselected,
+        type: 'bar',
+        name: 'selected'
+      })
+
+      this.newTraces.push({
+        x: X,
+        y: Yhidden,
+        type: 'bar',
+        name: 'hidden'
+      })
+
+      let normalizedData = dataTransformator.normalize(data, 20, 50)
+      this.newTraces.push({
+        type: 'scattermapbox',
+        lon: lon,
+        lat: lat,
+        marker: { size: normalizedData, color: 'rgba(0, 0, 255, 0.6)' },
+        text: data,
+        name: ''
+      })
+    } else {
+      console.log("UNEXPECTED GRAPH TYPE: " + graphType);
+    }
+
+    // this.onConfigChanged();
+    // this.render();
+
+    this.drawPlot();
+  }
 
   onDataReceived(dataList) {
-    this.newTraces = []
     if (!dataList || dataList.length < 1) {
       console.log('data is empty:', dataList);
       return;
     }
 
-    let { sortedSeries, allColumnNames } = dataTransformator.toTraces(dataList, this.cfg.dataColumnNames)
+    this.dataList = dataList;
 
-    this.cfg.dataColumnNames.all = allColumnNames
+    this.displaySelectedQuery((_xVal) => true);
 
-    console.log('series', sortedSeries);
-    console.log('allcolumns', allColumnNames);
-
-    sortedSeries.forEach((serie: Trace) => {
-      console.log('serie', serie)
-      let xVals = serie.x.map(String)
-      let yVals = serie.y
-
-      this.newTraces.push({
-        x: xVals,
-        y: yVals,
-        type: this.cfg.settings.type,
-        mode: this.cfg.settings.mode,
-        fill: this.cfg.settings.fill,
-        // text: hover text
-        // https://plot.ly/~alex/455/four-ways-to-change-opacity-of-scatter-markers.embed
-        // fillcolor: 'rgba(26, 150, 65, 0.4)',
-        name: serie.name
-      })
-    })
-
-    console.log("traces", this.newTraces);
-    // this.onConfigChanged();
-    // this.render();
-
-    this.drawPlot();
     // return;
 
     const finfo: SeriesWrapper[] = [];
@@ -666,10 +588,12 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
     // Load the real data changes
     annotationPromise.then(() => {
-      this._updateTraceData();
+      // this._updateTraceData();
       this.render();
     });
   }
+
+  /*
 
   __addCopyPath(trace: any, key: string, path: string) {
     if (key) {
@@ -684,124 +608,144 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     }
   }
 
-  // This will update all trace settings *except* the data
-  _updateTracesFromConfigs() {
-    this.dataWarnings = [];
-
-    // Make sure we have a trace
-    if (this.cfg.traces == null || this.cfg.traces.length < 1) {
-      this.cfg.traces = [_.cloneDeep(PlotlyPanelCtrl.defaultTrace)];
-    }
-
-    const is3D = this.is3d();
-    this.traces = this.cfg.traces.map((tconfig, idx) => {
-      const config = this.deepCopyWithTemplates(tconfig) || {};
-      _.defaults(config, PlotlyPanelCtrl.defaults);
-      const mapping = config.mapping;
-
-      const trace: any = {
-        name: config.name || EditorHelper.createTraceName(idx),
-        type: this.cfg.settings.type,
-        // mode: 'markers+lines', // really depends on config settings
-        __set: [], // { key:? property:? }
-      };
-
-      let mode = '';
-      if (config.show.markers) {
-        mode += '+markers';
-        trace.marker = config.settings.marker;
-
-        delete trace.marker.sizemin;
-        delete trace.marker.sizemode;
-        delete trace.marker.sizeref;
-
-        if (config.settings.color_option === 'ramp') {
-          this.__addCopyPath(trace, mapping.color, 'marker.color');
-        } else {
-          delete trace.marker.colorscale;
-          delete trace.marker.showscale;
-        }
+    // This will update all trace settings *except* the data
+    _updateTracesFromConfigs() {
+      this.dataWarnings = [];
+  
+      // Make sure we have a trace
+      if (this.cfg.traces == null || this.cfg.traces.length < 1) {
+        this.cfg.traces = [_.cloneDeep(defaultValues.defaultTrace)];
       }
-
-      if (config.show.lines) {
-        mode += '+lines';
-        trace.line = config.settings.line;
-      }
-
-      // Set the text
-      this.__addCopyPath(trace, mapping.text, 'text');
-      this.__addCopyPath(trace, mapping.x, 'x');
-      this.__addCopyPath(trace, mapping.y, 'y');
-
-      if (is3D) {
-        this.__addCopyPath(trace, mapping.z, 'z');
-      }
-
-      // Set the trace mode
-      if (mode) {
-        trace.mode = mode.substring(1);
-      }
-      return trace;
-    });
-  }
-
-  // Fills in the required data into the trace values
-  _updateTraceData(force = false): boolean {
-    if (!this.series) {
-      // console.log('NO Series data yet!');
-      return false;
-    }
-
-    if (force || !this.traces) {
-      this._updateTracesFromConfigs();
-    } else if (this.traces.length !== this.cfg.traces.length) {
-      console.log(
-        'trace number mismatch.  Found: ' +
-        this.traces.length +
-        ', expect: ' +
-        this.cfg.traces.length
-      );
-      this._updateTracesFromConfigs();
-    }
-
-    // Use zero when the metric value is missing
-    // Plotly gets lots of errors when the values are missing
-    let zero: any = [];
-    this.traces.forEach(trace => {
-      if (trace.__set) {
-        trace.__set.forEach(v => {
-          const s = this.seriesByKey.get(v.key);
-          let vals: any[] = zero;
-          if (s) {
-            vals = s.toArray();
-            if (vals && vals.length > zero.length) {
-              zero = Array.from(Array(3), () => 0);
-            }
+  
+      const is3D = this.is3d();
+      this.traces = this.cfg.traces.map((tconfig, idx) => {
+        const config = this.deepCopyWithTemplates(tconfig) || {};
+        _.defaults(config, defaultValues.defaultConfig);
+        const mapping = config.mapping;
+  
+        const trace: any = {
+          name: config.name || EditorHelper.createTraceName(idx),
+          type: this.cfg.settings.type,
+          // mode: 'markers+lines', // really depends on config settings
+          __set: [], // { key:? property:? }
+        };
+  
+        let mode = '';
+        if (config.show.markers) {
+          mode += '+markers';
+          trace.marker = config.settings.marker;
+  
+          delete trace.marker.sizemin;
+          delete trace.marker.sizemode;
+          delete trace.marker.sizeref;
+  
+          if (config.settings.color_option === 'ramp') {
+            this.__addCopyPath(trace, mapping.color, 'marker.color');
           } else {
-            if (!this.error) {
-              this.error = '';
-            }
-            this.error += 'Unable to find: ' + v.key + ' (using zeros).  ';
+            delete trace.marker.colorscale;
+            delete trace.marker.showscale;
           }
-          if (!vals) {
-            vals = zero;
-          }
-          _.set(trace, v.path, vals);
-        });
+        }
+  
+        if (config.show.lines) {
+          mode += '+lines';
+          trace.line = config.settings.line;
+        }
+  
+        // Set the text
+        this.__addCopyPath(trace, mapping.text, 'text');
+        this.__addCopyPath(trace, mapping.x, 'x');
+        this.__addCopyPath(trace, mapping.y, 'y');
+  
+        if (is3D) {
+          this.__addCopyPath(trace, mapping.z, 'z');
+        }
+  
+        // Set the trace mode
+        if (mode) {
+          trace.mode = mode.substring(1);
+        }
+        return trace;
+      });
+    }
+  
+    // Fills in the required data into the trace values
+    _updateTraceData(force = false): boolean {
+      if (!this.series) {
+        // console.log('NO Series data yet!');
+        return false;
       }
-    });
+  
+      if (force || !this.traces) {
+        this._updateTracesFromConfigs();
+      } else if (this.traces.length !== this.cfg.traces.length) {
+        console.log(
+          'trace number mismatch.  Found: ' +
+          this.traces.length +
+          ', expect: ' +
+          this.cfg.traces.length
+        );
+        this._updateTracesFromConfigs();
+      }
+  
+      // Use zero when the metric value is missing
+      // Plotly gets lots of errors when the values are missing
+      let zero: any = [];
+      this.traces.forEach(trace => {
+        if (trace.__set) {
+          trace.__set.forEach(v => {
+            const s = this.seriesByKey.get(v.key);
+            let vals: any[] = zero;
+            if (s) {
+              vals = s.toArray();
+              if (vals && vals.length > zero.length) {
+                zero = Array.from(Array(3), () => 0);
+              }
+            } else {
+              if (!this.error) {
+                this.error = '';
+              }
+              this.error += 'Unable to find: ' + v.key + ' (using zeros).  ';
+            }
+            if (!vals) {
+              vals = zero;
+            }
+            _.set(trace, v.path, vals);
+          });
+        }
+      });
+  
+      return true;
+    }
+  */
 
-    //console.log('SetDATA', this.traces);
-    return true;
+  fillAndSwitchSelector() {
+    if (this.queriesDescriptions.length > 1) {
+      this.selectorDiv.style.visibility = "visible";
+      this.selectorSelect.innerHTML = "";
+      this.queriesDescriptions.forEach((queryConf: any) => {
+        let option = document.createElement("option");
+        option.text = queryConf.queryTitle;
+        option.value = queryConf.queryNumber;
+
+        this.selectorSelect.add(option)
+      })
+
+      console.log('updating switch with values from: ', this.queriesDescriptions)
+    } else {
+      this.selectorDiv.style.visibility = "hidden"
+    }
   }
 
   onConfigChanged() {
     // Force reloading the traces
-    this._updateTraceData(true);
+    // this._updateTraceData(true);
 
     if (!Plotly) {
       return;
     }
+
+    this.fillAndSwitchSelector();
 
     // Check if the plotly library changed
     loadIfNecessary(this.cfg).then(res => {
@@ -831,13 +775,17 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   link(scope, elem, attrs, ctrl) {
     this.graphDiv = elem.find('.plotly-spot')[0];
+
+    this.selectorDiv = elem.find('.query-selector-div')[0];
+    this.selectorSelect = elem.find('.query-selector')[0];
+    let panel = this;
+    this.selectorSelect.addEventListener("change", function () { panel.displaySelectedQuery((_xVal) => true) });
     this.initialized = false;
     elem.on('mousemove', evt => {
       this.mouse = evt;
     });
 
-    //let p = $(this.graphDiv).parent().parent()[0];
-    //console.log( 'PLOT', this.graphDiv, p );
+    this.fillAndSwitchSelector();
   }
 }
 
