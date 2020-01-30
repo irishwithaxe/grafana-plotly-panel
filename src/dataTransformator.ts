@@ -24,14 +24,26 @@ export class dataTransformator {
         let newDelta = newMax - newMin;
 
         if (delta != 0) {
-            return data.map(value => ((value - min) / delta) * newDelta + newMin)
+            return data.map(value => {
+                if (value == 0) {
+                    return 0
+                } else {
+                    return ((value - min) / delta) * newDelta + newMin
+                }
+            })
         }
         else {
-            return data.map(_v => newMin)
+            return data.map(value => {
+                if (value == 0) {
+                    return 0
+                } else {
+                    return newMin
+                }
+            })
         }
     }
 
-    static toLatLonDataObject(dataSet, dataColumnNames, xValueFilter) {
+    static toLatLonTraces(dataSet, dataColumnNames, xValueFilter) {
         if (this.debug) {
             console.log(this.ident, 'whole dataSet', dataSet);
             console.log(this.ident, 'data columns', dataColumnNames);
@@ -149,30 +161,43 @@ export class dataTransformator {
 
         len = maxHour + 1
         let X: number[] = new Array<number>(len).map(() => 0)
-        let Yselected: number[] = new Array<number>(len).map(() => 0)
-        let Yhidden: number[] = new Array<number>(len).map(() => 0)
+        let Y: number[] = new Array<number>(len).map(() => 0)
+        let opacity: number[] = new Array<number>(len).map(() => 0)
         for (var i = 0; i < len; i++) {
             X[i] = i
-            Yselected[i] = 0
-            Yhidden[i] = 0
+            Y[i] = 0
+            opacity[i] = 1
         }
 
         graphPoints.forEach((pointVal, pointKey) => {
-            if (xValueFilter(pointKey)) {
-                Yselected[pointKey] = pointVal
-            }
-            else {
-                Yhidden[pointKey] = pointVal
-            }
+            if (!xValueFilter(pointKey)) {
+                opacity[pointKey] = 0.4
+            }6
+            Y[pointKey] = pointVal
         })
 
+        let Ynormalized = dataTransformator.normalize(Y, 20, 50)
+        let barTrace = {
+            x: X,
+            y: Ynormalized,
+            type: 'bar',
+            marker: { opacity: opacity },
+            text: Y,
+        }
+
+        let normalizedData = dataTransformator.normalize(data, 20, 50)
+        let mapTrace = {
+            type: 'scattermapbox',
+            lon: lon,
+            lat: lat,
+            opacity: 0.6,
+            marker: { size: normalizedData },
+            text: data,
+        }
+
         return Object({
-            lat,
-            lon,
-            data,
-            X,
-            Yselected,
-            Yhidden,
+            mapTrace,
+            barTrace,
             allColumnNames
         })
     }

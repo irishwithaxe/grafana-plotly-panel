@@ -152,7 +152,7 @@ export class EditorHelper {
       this.updateSegMapping(value, key);
     });
 
-    console.log('Editor Info', this);
+    //console.log('Editor Info', this);
 
     this.onConfigChanged();
     this.ctrl.refresh();
@@ -185,7 +185,7 @@ export class EditorHelper {
 
     if (updateTrace) {
       this.trace.mapping[key] = value;
-      console.log('SET', key, value, this.trace.mapping);
+      // console.log('SET', key, value, this.trace.mapping);
     }
   }
 
@@ -255,7 +255,7 @@ export class EditorHelper {
         );
       });
 
-      console.log("series", series);
+      // console.log("series", series);
       resolve(series);
     });
   }

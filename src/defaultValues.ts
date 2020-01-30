@@ -56,24 +56,26 @@ export class defaultValues {
             },
             queriesDescription: [
                 {
-                    dataColumnNames: {
+                    columnNames: {
                         dataColumn: "count",
                         xColumn: "simulation-hour",
                         lonColumn: "lon",
                         latColumn: "lat",
                     },
                     queryTitle: "count of events",
-                    queryNumber: "1"
+                    queryNumber: "1",
+                    color: 'green'
                 },
                 {
-                    dataColumnNames: {
+                    columnNames: {
                         dataColumn: "averageLoad",
                         xColumn: "simulation-hour",
                         lonColumn: "lon",
                         latColumn: "lat"
                     },
                     queryTitle: "average charging load",
-                    queryNumber: "0"
+                    queryNumber: "0",
+                    color: 'blue'
                 },
             ],
             layout: {
@@ -83,7 +85,7 @@ export class defaultValues {
                 },
                 barmode: 'stack',
                 dragmode: 'zoom', // (enumerated: "zoom" | "pan" | "select" | "lasso" | "orbit" | "turntable" )
-                hovermode: 'closest',
+                //hovermode: 'compare', // 'closest',
                 font: {
                     family: '"Open Sans", Helvetica, Arial, sans-serif',
                 },
