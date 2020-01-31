@@ -14,9 +14,15 @@ const REMOVE_KEY = '-- remove --';
 
 export class EditorHelper {
   axis = new Array<AxisInfo>();
-  trace: any; // Trace Config
+  debug = false;
+
   traceIndex = 0;
   traces: any[]; // array of configs;
+  trace: any; // Trace Config
+
+  queryIndex = 0;
+  queries: any[];
+  query: any;
 
   symbol: any; // The Grafana <metric-segment for this symbol
   mapping: any = {}; // The Grafana <metric-segment for this symbol
@@ -25,6 +31,7 @@ export class EditorHelper {
   constructor(public ctrl: PlotlyPanelCtrl) {
     EditorHelper.updateMappings(ctrl);
     this.selectTrace(0);
+    this.selectQuery(0);
   }
 
   // Callback when the query results changed
@@ -122,13 +129,90 @@ export class EditorHelper {
   }
 
   //-----------------------------------------------------------------------
+  // Manage Queries
+  //-----------------------------------------------------------------------
+
+  selectQuery(index: number) {
+    this.queries = this.ctrl.cfg.queriesDescription;
+
+    if (!this.queries || this.queries.length < 1) {
+      this.queries = this.ctrl.cfg.queriesDescription = [_.cloneDeep(defaultValues.defaultQueryDescription)];
+    }
+
+    if (index >= this.queries.length) {
+      index = this.queries.length - 1;
+    }
+
+    this.query = this.queries[index]
+    this.queryIndex = index;
+
+    // this.onConfigChanged();
+    // this.ctrl.refresh();
+
+    if (this.debug) {
+      console.log('query select', 'editor:', this);
+    }
+  }
+
+  createQuery() {
+    var queryDescription: any = _.cloneDeep(defaultValues.defaultQueryDescription)
+
+    var queryNumber: number = 0
+    this.queries.forEach(q => {
+      let number: number = Number(q.queryNumber)
+      if (number > queryNumber) {
+        queryNumber = number
+      }
+    })
+
+    if (this.queries.length > 0) {
+      queryNumber += 1
+    }
+
+    queryDescription.queryNumber = queryNumber
+    this.ctrl.cfg.queriesDescription.push(queryDescription)
+    this.selectQuery(queryNumber)
+    this.ctrl.refresh();
+
+    if (this.debug) {
+      console.log('query create', 'new', queryDescription, 'editor:', this)
+    }
+  }
+
+  removeCurrentQuery() {
+    if (!this.query.queryNumber || this.queries.length < 1) {
+      return;
+    }
+
+    for (let i = 0; i < this.ctrl.cfg.queriesDescription.length; i++) {
+      if (this.query.queryNumber === this.ctrl.cfg.queriesDescription[i].queryNumber) {
+        this.ctrl.cfg.queriesDescription.splice(i, 1);
+        if (i >= this.ctrl.cfg.queriesDescription.length) {
+          i = this.ctrl.cfg.queriesDescription.length - 1;
+        }
+
+        //this.ctrl.onConfigChanged();
+        this.selectQuery(i);
+        this.ctrl.refresh();
+
+        if (this.debug) {
+          console.log('query remove', 'editor:', this)
+        }
+        return;
+      }
+    }
+
+    this.ctrl.dataWarnings.push('can\'t delete selected query.')
+  }
+
+  //-----------------------------------------------------------------------
   // Manage Traces
   //-----------------------------------------------------------------------
 
   selectTrace(index: number) {
     this.traces = this.ctrl.cfg.traces;
     if (!this.traces || this.traces.length < 1) {
-      this.traces = this.ctrl.cfg.traces = [_.deepClone(defaultValues.defaultTrace)];
+      this.traces = this.ctrl.cfg.traces = [_.cloneDeep(defaultValues.defaultTrace)];
     }
     if (index >= this.ctrl.cfg.traces.length) {
       index = this.ctrl.cfg.traces.length - 1;
@@ -194,7 +278,7 @@ export class EditorHelper {
     if (this.ctrl.cfg.traces.length > 0) {
       trace = _.cloneDeep(this.ctrl.cfg.traces[this.ctrl.cfg.traces.length - 1]);
     } else {
-      trace = _.deepClone(defaultValues.defaultTrace);
+      trace = _.cloneDeep(defaultValues.defaultTrace);
     }
     trace.name = EditorHelper.createTraceName(this.ctrl.traces.length);
     this.ctrl.cfg.traces.push(trace);
@@ -215,7 +299,6 @@ export class EditorHelper {
           i = this.traces.length - 1;
         }
         this.ctrl.onConfigChanged();
-        // this.ctrl._updateTraceData(true);
         this.selectTrace(i);
         this.ctrl.refresh();
         return;

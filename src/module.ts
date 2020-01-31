@@ -43,8 +43,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   dataColumns: any[];
   newTraces: any[];
 
-  queriesDescriptions: any;
-
   traces: any[]; // The data sent directly to Plotly -- with a special __copy element
   layout: any; // The layout used by Plotly
 
@@ -74,7 +72,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     this.cfg = this.panel.pconfig;
 
     this.traces = [];
-    this.queriesDescriptions = this.defaultPanelConfigs.pconfig.queriesDescription;
 
     // ?? This seems needed for tests?!!
     if (!this.events) {
@@ -163,8 +160,10 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   onInitEditMode() {
     this.editor = new EditorHelper(this);
     this.addEditorTab('Display', 'public/plugins/natel-plotly-panel/partials/tab_display.html', 2);
-    this.addEditorTab('Traces', 'public/plugins/natel-plotly-panel/partials/tab_traces.html', 3);
-    //  this.editorTabIndex = 1;
+    this.addEditorTab('Queries', 'public/plugins/natel-plotly-panel/partials/tab_queries.html', 3);
+    // this.addEditorTab('Traces', 'public/plugins/natel-plotly-panel/partials/tab_traces.html', 4);
+    // this.editorTabIndex = 1;
+    
     this.onConfigChanged(); // Sets up the axis info
 
     // Check the size in a little bit
@@ -417,7 +416,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
       var querieDescription: any;
 
-      this.queriesDescriptions.forEach(element => {
+      this.cfg.queriesDescription.forEach(element => {
         let queryNumber: number = Number(element.queryNumber)
         if (queryNumber == index) {
           querieDescription = element

@@ -37,6 +37,18 @@ export class defaultValues {
         },
     };
 
+    public static defaultQueryDescription = {
+        columnNames: {
+            dataColumn: "",
+            xColumn: "",
+            lonColumn: "lon",
+            latColumn: "lat",
+        },
+        queryTitle: "",
+        queryNumber: 0,
+        color: "gray"
+    }
+
     public static defaultConfig = {
         pconfig: {
             loadFromCDN: false,
