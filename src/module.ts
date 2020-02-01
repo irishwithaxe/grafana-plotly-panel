@@ -163,7 +163,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     this.addEditorTab('Queries', 'public/plugins/natel-plotly-panel/partials/tab_queries.html', 3);
     // this.addEditorTab('Traces', 'public/plugins/natel-plotly-panel/partials/tab_traces.html', 4);
     // this.editorTabIndex = 1;
-    
+
     this.onConfigChanged(); // Sets up the axis info
 
     // Check the size in a little bit
@@ -352,7 +352,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     this.pointsSelected = {}
     data.points.forEach(p => this.pointsSelected[p.x] = true)
 
-    this.displaySelectedQuery()
+    this.displayQueries()
   }
 
   onRender() {
@@ -400,7 +400,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   _hadAnno = false;
 
-  displaySelectedQuery() {
+  displayQueries() {
     let firstTraces: any[] = []
     let secondTraces: any[] = []
 
@@ -411,6 +411,28 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       }
       return true
     }
+
+    /*
+    if (this.dataList.length === 1) {
+      let row = this.dataList[0]
+
+      if (!this.cfg.queriesDescription || this.cfg.queriesDescription.length < 1) {
+        this.cfg.queriesDescription = [_.cloneDeep(defaultValues.defaultQueryDescription)];
+      }
+
+      if (this.cfg.dataColumnNames.dataColumn && this.cfg.dataColumnNames.dataColumn != '?') {
+        this.cfg.queriesDescription[0].columnNames.dataColumn = this.cfg.dataColumnNames.dataColumn
+        this.cfg.queriesDescription[0].columnNames.xColumn = this.cfg.dataColumnNames.xColumn
+        this.cfg.queriesDescription[0].columnNames.yColumn = this.cfg.dataColumnNames.yColumn
+      } else {
+        this.cfg.queriesDescription[0].columnNames.dataColumn = row.columns[2].text
+        this.cfg.queriesDescription[0].columnNames.xColumn = row.columns[1].text
+        this.cfg.queriesDescription[0].columnNames.yColumn = row.columns[3].text
+      }
+
+      // console.log('result', this.cfg.queriesDescription[0].columnNames)
+    }
+    */
 
     this.dataList.forEach((dataRow, index) => {
 
@@ -454,12 +476,10 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
         this.cfg.dataColumnNames.all = allColumnNames
 
         barTrace.marker.color = querieDescription.color
-        //barTrace.marker.line = { color: 'black', width: 2 }
         barTrace.name = queryTitle
         firstTraces.push(barTrace)
 
         mapTrace.marker.color = querieDescription.color
-        //mapTrace.marker.line = { color: 'black', width: 2 }
         mapTrace.name = queryTitle
         secondTraces.push(mapTrace)
       } else {
@@ -505,7 +525,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
     this.dataList = dataList;
 
-    this.displaySelectedQuery();
+    this.displayQueries();
 
     // return;
 

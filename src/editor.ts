@@ -146,9 +146,6 @@ export class EditorHelper {
     this.query = this.queries[index]
     this.queryIndex = index;
 
-    // this.onConfigChanged();
-    // this.ctrl.refresh();
-
     if (this.debug) {
       console.log('query select', 'editor:', this);
     }
@@ -191,7 +188,6 @@ export class EditorHelper {
           i = this.ctrl.cfg.queriesDescription.length - 1;
         }
 
-        //this.ctrl.onConfigChanged();
         this.selectQuery(i);
         this.ctrl.refresh();
 

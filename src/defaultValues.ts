@@ -41,8 +41,9 @@ export class defaultValues {
         columnNames: {
             dataColumn: "",
             xColumn: "",
-            lonColumn: "lon",
-            latColumn: "lat",
+            yColumn: "",
+            lonColumn: "",
+            latColumn: "",
         },
         queryTitle: "",
         queryNumber: 0,
@@ -61,35 +62,35 @@ export class defaultValues {
                 mode: 'None',
                 displayModeBar: true,
             },
-            dataColumnNames: {
-                dataColumn: '',
-                xColumn: '',
-                yColumn: ''
-            },
-            queriesDescription: [
-                {
-                    columnNames: {
-                        dataColumn: "count",
-                        xColumn: "simulation-hour",
-                        lonColumn: "lon",
-                        latColumn: "lat",
-                    },
-                    queryTitle: "count of events",
-                    queryNumber: "1",
-                    color: 'green'
-                },
-                {
-                    columnNames: {
-                        dataColumn: "averageLoad",
-                        xColumn: "simulation-hour",
-                        lonColumn: "lon",
-                        latColumn: "lat"
-                    },
-                    queryTitle: "average charging load",
-                    queryNumber: "0",
-                    color: 'blue'
-                },
-            ],
+            // dataColumnNames: {
+            //     dataColumn: '',
+            //     xColumn: '',
+            //     yColumn: ''
+            // },
+            // queriesDescription: [
+            //     {
+            //         columnNames: {
+            //             dataColumn: "count",
+            //             xColumn: "simulation-hour",
+            //             lonColumn: "lon",
+            //             latColumn: "lat",
+            //         },
+            //         queryTitle: "count of events",
+            //         queryNumber: "1",
+            //         color: 'green'
+            //     },
+            //     {
+            //         columnNames: {
+            //             dataColumn: "averageLoad",
+            //             xColumn: "simulation-hour",
+            //             lonColumn: "lon",
+            //             latColumn: "lat"
+            //         },
+            //         queryTitle: "average charging load",
+            //         queryNumber: "0",
+            //         color: 'blue'
+            //     },
+            // ],
             layout: {
                 showlegend: false,
                 legend: {
@@ -102,12 +103,16 @@ export class defaultValues {
                     family: '"Open Sans", Helvetica, Arial, sans-serif',
                 },
                 xaxis: {
+                    autorange: true,
+                    fixedrange: false,
                     showgrid: true,
                     zeroline: false,
                     type: 'auto',
                     rangemode: 'normal', // (enumerated: "normal" | "tozero" | "nonnegative" )
                 },
                 yaxis: {
+                    autorange: true,
+                    fixedrange: false,
                     showgrid: true,
                     zeroline: false,
                     type: 'linear',

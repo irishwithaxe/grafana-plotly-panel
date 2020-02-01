@@ -6,7 +6,7 @@ let wasCDN = false;
 
 export function loadPlotly(cfg: any): Promise<any> {
   if (loaded) {
-    console.log('using already loaded value');
+    // console.log('using already loaded value');
     return Promise.resolve(loaded);
   }
 
