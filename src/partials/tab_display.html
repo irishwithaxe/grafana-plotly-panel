@@ -40,30 +40,7 @@
 
     <gf-form-switch class="gf-form" label="Toolbar" label-class="gf-form-label width-7"
       checked="ctrl.cfg.settings.displayModeBar" on-change="ctrl.editor.onConfigChanged()"></gf-form-switch>
-
-    <div class="gf-form">
-      <label class="gf-form-label width-7">all columns</label>
-      <input class="gf-form-input" readonly ng-model="ctrl.cfg.dataColumnNames.all">
-    </div>
-
-    <div class="gf-form">
-      <label class="gf-form-label width-7">group column</label>
-      <input class="gf-form-input width-7" placeholder="No Label" ng-model="ctrl.cfg.dataColumnNames.dataColumn"
-        ng-change="ctrl.onConfigChanged();">
-    </div>
-
-    <div class="gf-form">
-      <label class="gf-form-label width-7">X column</label>
-      <input class="gf-form-input width-7" placeholder="No Label" ng-model="ctrl.cfg.dataColumnNames.xColumn"
-        ng-change="ctrl.onConfigChanged();">
-    </div>
-
-    <div class="gf-form">
-      <label class="gf-form-label width-7">Y column</label>
-      <input class="gf-form-input width-7" placeholder="No Label" ng-model="ctrl.cfg.dataColumnNames.yColumn"
-        ng-change="ctrl.onConfigChanged();">
-    </div>
-
+      
   </div>
 
   <div class="section gf-form-group">
