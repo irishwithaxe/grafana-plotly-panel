@@ -134,6 +134,7 @@ export class dataTransformator {
         }
 
         let len = mapPoints.size
+
         let lat: number[] = new Array<number>(len);
         let lon: number[] = new Array<number>(len);
         let data: number[] = new Array<number>(len);

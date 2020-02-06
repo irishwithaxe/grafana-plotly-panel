@@ -51,7 +51,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   // For editor
   editor: EditorHelper;
-  dataWarnings: string[]; // warnings about loading data
+  dataWarnings: string[] = [] // warnings about loading data
 
   /** @ngInject **/
   constructor(
@@ -470,7 +470,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
             name: serie.name
           })
         })
-      } else if (graphType === 'scattermapbox') {
+      } else if (graphType === 'scattermapbox' && columnNames.latColumn && columnNames.lonColumn && columnNames.dataColumn) {
         let { mapTrace, barTrace, allColumnNames } = dataTransformator.toLatLonTraces(dataRow, columnNames, filter)
 
         this.cfg.dataColumnNames.all = allColumnNames
@@ -483,7 +483,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
         mapTrace.name = queryTitle
         secondTraces.push(mapTrace)
       } else {
-        this.dataWarnings.push("UNEXPECTED GRAPH TYPE: " + graphType);
+        this.dataWarnings.push("UNEXPECTED GRAPH TYPE: " + graphType, 'or lack of data configuration');
       }
     });
 
@@ -518,16 +518,26 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   }
 
   onDataReceived(dataList) {
+    this.dataWarnings = [];
+
     if (!dataList || dataList.length < 1) {
       if (this.debug) { console.log('data is empty:', dataList); }
       return;
     }
 
+    if (!this.cfg.queriesDescription || this.cfg.queriesDescription.length < 1) {
+      if (this.debug) { console.log('queries discriptions are missing') }
+      return;
+    }
+
+    if (this.debug) {
+      console.log('data received: dataList', dataList)
+      console.log('data received: queriesDescription', this.cfg.queriesDescription)
+    }
+
     this.dataList = dataList;
 
     this.displayQueries();
-
-    // return;
 
     const finfo: SeriesWrapper[] = [];
     let seriesHash = '/';
@@ -631,7 +641,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
     // This will update all trace settings *except* the data
     _updateTracesFromConfigs() {
-      this.dataWarnings = [];
   
       // Make sure we have a trace
       if (this.cfg.traces == null || this.cfg.traces.length < 1) {
