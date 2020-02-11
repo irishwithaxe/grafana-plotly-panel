@@ -177,10 +177,9 @@ export class dataTransformator {
             Y[pointKey] = pointVal
         })
 
-        let Ynormalized = dataTransformator.normalize(Y, 20, 50)
         let barTrace = {
             x: X,
-            y: Ynormalized,
+            y: Y,
             type: 'bar',
             marker: { opacity: opacity },
             text: Y,

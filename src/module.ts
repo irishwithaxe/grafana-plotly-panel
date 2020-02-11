@@ -42,6 +42,9 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   dataColumns: any[];
   newTraces: any[];
+  newTracesBarCount: number = 0; // count of traces for bar chart when 'scattermapbox' graph type has chosen
+  newTracesMapFirstNumber: number = 0; // count of traces for bar chart when 'scattermapbox' graph type has chosen
+  yAxisTitleForScatterMapBox : any = '' // title for Y axis, only for 'scattermapbox'
 
   traces: any[]; // The data sent directly to Plotly -- with a special __copy element
   layout: any; // The layout used by Plotly
@@ -263,14 +266,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       }
     }
 
-    layout.margin = {
-      l: layout.yaxis.title ? 50 : 35,
-      r: 5,
-      t: 0,
-      b: layout.xaxis.title ? 65 : 30,
-      pad: 2,
-    };
-
     // get the css rule of grafana graph axis text
     const labelStyle = this.getCssRule('div.flot-text');
     if (labelStyle) {
@@ -305,7 +300,17 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       }
       layout.xaxis.domain = [0, 1]
       layout.yaxis.domain = [0.85, 1]
+
+      layout.yaxis.title = this.yAxisTitleForScatterMapBox
     }
+
+    layout.margin = {
+      l: layout.yaxis.title ? 50 : 35,
+      r: 5,
+      t: 0,
+      b: layout.xaxis.title ? 65 : 30,
+      pad: 2,
+    };
 
     delete layout.scene;
     delete layout.zaxis;
@@ -366,7 +371,29 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     }
 
     if (!this.initialized) {
-      this.drawPlot();
+      
+      // only for 'scattermapbox' graph type
+      // function to:
+      // - display selected bar trace and corresponding map trace
+      // - hide the rest traces
+      // - change Y axis text
+      let displaySelectedTrace = (selectedTraceNumber: number) => {
+        this.newTraces.forEach(trace => {
+          trace.visible = 'legendonly';
+        })
+
+        this.newTraces[selectedTraceNumber].visible = 'true';
+        this.newTraces[selectedTraceNumber + this.newTracesMapFirstNumber].visible = 'true';        
+        this.yAxisTitleForScatterMapBox = this.cfg.queriesDescription[selectedTraceNumber].yaxistext;
+        
+        this.drawPlot();
+      }
+
+      if (this.cfg.settings.type === 'scattermapbox') {
+        displaySelectedTrace(0);
+      } else {
+        this.drawPlot();
+      }
 
       this.graphDiv.on('plotly_click', data => {
         if (data === undefined || data.points === undefined) {
@@ -386,6 +413,22 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
         if (this.debug) { console.log('on select', data); }
       });
 
+      if (this.cfg.settings.type === 'scattermapbox') {
+        this.graphDiv.on('plotly_legendclick', data => {
+          let selectedTraceNumber = data.curveNumber
+          if (selectedTraceNumber < this.newTracesBarCount) {
+            displaySelectedTrace(selectedTraceNumber);
+            return false;
+          } else if (selectedTraceNumber < this.newTracesMapFirstNumber) {
+            return false;
+          } else {
+            return true;
+          }
+        });
+      }
+
+      this.graphDiv.on('plotly_legenddoubleclick', () => false);
+
       this.initialized = true;
     } else if (this.initialized) {
       Plotly.redraw(this.graphDiv);
@@ -403,6 +446,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   displayQueries() {
     let firstTraces: any[] = []
     let secondTraces: any[] = []
+    let thirdTraces: any[] = []
 
     let pointsSelected = this.pointsSelected
     let filter = function (value) {
@@ -411,28 +455,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       }
       return true
     }
-
-    /*
-    if (this.dataList.length === 1) {
-      let row = this.dataList[0]
-
-      if (!this.cfg.queriesDescription || this.cfg.queriesDescription.length < 1) {
-        this.cfg.queriesDescription = [_.cloneDeep(defaultValues.defaultQueryDescription)];
-      }
-
-      if (this.cfg.dataColumnNames.dataColumn && this.cfg.dataColumnNames.dataColumn != '?') {
-        this.cfg.queriesDescription[0].columnNames.dataColumn = this.cfg.dataColumnNames.dataColumn
-        this.cfg.queriesDescription[0].columnNames.xColumn = this.cfg.dataColumnNames.xColumn
-        this.cfg.queriesDescription[0].columnNames.yColumn = this.cfg.dataColumnNames.yColumn
-      } else {
-        this.cfg.queriesDescription[0].columnNames.dataColumn = row.columns[2].text
-        this.cfg.queriesDescription[0].columnNames.xColumn = row.columns[1].text
-        this.cfg.queriesDescription[0].columnNames.yColumn = row.columns[3].text
-      }
-
-      // console.log('result', this.cfg.queriesDescription[0].columnNames)
-    }
-    */
 
     this.dataList.forEach((dataRow, index) => {
 
@@ -481,38 +503,67 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
         mapTrace.marker.color = querieDescription.color
         mapTrace.name = queryTitle
-        secondTraces.push(mapTrace)
+        thirdTraces.push(mapTrace)
       } else {
         this.dataWarnings.push("UNEXPECTED GRAPH TYPE: " + graphType, 'or lack of data configuration');
       }
     });
 
-    this.newTraces = []
-
-    if (this.graphDiv.data) {
-      let visibility: any[] = []
-      this.graphDiv.data.forEach(trace => visibility.push(trace.visible))
-
-      var index = 0
-
-      firstTraces.forEach(trace => {
-        trace.visible = visibility[index]
-        index++
-        this.newTraces.push(trace)
+    // adding a separator between map and bars traces
+    if (this.cfg.settings.type === 'scattermapbox') {
+      secondTraces.push({
+        x: [0],
+        y: [0],
+        type: 'scatter',
+        name: '        ',
+        visible: 'legendonly',
+        mode: 'none'
       })
-
-      secondTraces.forEach(trace => {
-        trace.visible = visibility[index]
-        index++
-        this.newTraces.push(trace)
+      secondTraces.push({
+        x: [0],
+        y: [0],
+        type: 'scatter',
+        name: '        ',
+        visible: 'legendonly',
+        mode: 'none'
       })
-    } else {
-      firstTraces.forEach(trace => this.newTraces.push(trace))
-      secondTraces.forEach(trace => this.newTraces.push(trace))
     }
 
-    // this.onConfigChanged();
-    // this.render();
+    this.newTraces = []
+
+    let visibility: any[] = []
+
+    if (this.graphDiv.data) {
+      this.graphDiv.data.forEach(trace => visibility.push(trace.visible))
+    } else {
+      let len = firstTraces.length + secondTraces.length + thirdTraces.length;
+      visibility = new Array<any>(len);
+      visibility.fill('true');
+    }
+
+    var index = 0
+
+    firstTraces.forEach(trace => {
+      trace.visible = visibility[index]
+      index++
+      this.newTraces.push(trace)
+    })
+
+    this.newTracesBarCount = index;
+
+    secondTraces.forEach(trace => {
+      trace.visible = visibility[index]
+      index++
+      this.newTraces.push(trace)
+    })
+
+    this.newTracesMapFirstNumber = index;
+
+    thirdTraces.forEach(trace => {
+      trace.visible = visibility[index]
+      index++
+      this.newTraces.push(trace)
+    })
 
     this.drawPlot();
   }

@@ -47,7 +47,8 @@ export class defaultValues {
         },
         queryTitle: "",
         queryNumber: 0,
-        color: "gray"
+        color: "gray",
+        yaxistext: ""
     }
 
     public static defaultConfig = {
