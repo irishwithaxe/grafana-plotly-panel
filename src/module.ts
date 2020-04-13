@@ -44,13 +44,22 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   newTraces: any[];
   newTracesBarCount: number = 0; // count of traces for bar chart when 'scattermapbox' graph type has chosen
   newTracesMapFirstNumber: number = 0; // count of traces for bar chart when 'scattermapbox' graph type has chosen
-  yAxisTitleForScatterMapBox : any = '' // title for Y axis, only for 'scattermapbox'
+  yAxisTitleForScatterMapBox: any = '' // title for Y axis, only for 'scattermapbox'
 
   traces: any[]; // The data sent directly to Plotly -- with a special __copy element
   layout: any; // The layout used by Plotly
 
+  mapArea: { lat: number, lon: number, zoom: number } = {
+    lat: 0,
+    lon: 0,
+    zoom: 0
+  }
+
   mouse: any;
   cfg: any;
+
+  variableSrv: any;
+  dashboardVariables: Map<string, any> = new Map();
 
   // For editor
   editor: EditorHelper;
@@ -63,9 +72,12 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     $window,
     // private $rootScope,
     public uiSegmentSrv,
-    private annotationsSrv
+    private annotationsSrv,
+    variableSrv
   ) {
     super($scope, $injector);
+
+    this.variableSrv = variableSrv;
 
     this.initialized = false;
 
@@ -133,6 +145,25 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       if (this.debug) { console.log('redraw with layout:', this.layout); }
     }
   }, 50);
+
+  dashboardVariablesUpdate() {
+    this.dashboardVariables.clear();
+
+    this.variableSrv.variables.forEach(dashboardVariable => {
+      this.dashboardVariables.set(dashboardVariable.name, dashboardVariable.current.value)
+    })
+
+    if (this.debug) { console.log("dashboard vars:", this.dashboardVariables) }
+  }
+
+  dashboardVariableNumericValue(variableName) {
+    if (this.dashboardVariables.has(variableName)) {
+      return Number.parseFloat(this.dashboardVariables.get(variableName))
+    }
+
+    if (this.debug) { console.log('there is no such dashboard variable with name', variableName) }
+    return 0.0
+  }
 
   onResize() {
     if (this.debug) {
@@ -286,22 +317,53 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
       layout.yaxis.gridcolor = color;
     }
 
+    let oldLayout = this.graphDiv.layout
+
     // for scattermapbox: display two plots instead of one
     // one plot is bars and another is scattermapbox
     if (this.cfg.settings.type === 'scattermapbox') {
+      let latMinVarName = this.cfg.settings.map.latMin
+      let latMaxVarName = this.cfg.settings.map.latMax
+      let lonMinVarName = this.cfg.settings.map.lonMin
+      let lonMaxVarName = this.cfg.settings.map.lonMax
+
+      let latMin = this.dashboardVariableNumericValue(latMinVarName)
+      let latMax = this.dashboardVariableNumericValue(latMaxVarName)
+      let lonMin = this.dashboardVariableNumericValue(lonMinVarName)
+      let lonMax = this.dashboardVariableNumericValue(lonMaxVarName)
+
+      let lat = (latMin + latMax) / 2
+      let lon = (lonMin + lonMax) / 2
+
+      let diff = Math.max(Math.abs(latMax - latMin), Math.abs(lonMax - lonMin))
+      let zoom = 11 - (diff * 1.4) // 1.4 - empirically chosen constant
+
       layout.mapbox = {
         domain: {
           x: [0, 1],
           y: [0, 0.8]
         },
-        center: { lon: -122.4, lat: 37.75 },
+        center: { lon: lon, lat: lat },
         style: "open-street-map",
-        zoom: 11
+        zoom: zoom
       }
       layout.xaxis.domain = [0, 1]
       layout.yaxis.domain = [0.85, 1]
 
       layout.yaxis.title = this.yAxisTitleForScatterMapBox
+
+      // so, map zoom|lat|lon won't change from the values user specifieed manually
+      // unless we obtain new set of dashboard variables
+      if (oldLayout && oldLayout.mapbox && oldLayout.mapbox.center) {
+        if (this.mapArea.zoom != zoom || this.mapArea.lat != lat || this.mapArea.lon != lon) {
+          this.mapArea.zoom = zoom;
+          this.mapArea.lat = lat;
+          this.mapArea.lon = lon;
+        } else {
+          layout.mapbox.center = oldLayout.mapbox.center
+          layout.mapbox.zoom = oldLayout.mapbox.zoom
+        }
+      }
     }
 
     layout.margin = {
@@ -317,11 +379,6 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     delete layout.xaxis.range;
     delete layout.yaxis.range;
 
-    let oldLayout = this.graphDiv.layout
-    if (oldLayout && oldLayout.mapbox && oldLayout.mapbox.center) {
-      layout.mapbox.center = oldLayout.mapbox.center
-      layout.mapbox.zoom = oldLayout.mapbox.zoom
-    }
     if (oldLayout && oldLayout.xaxis && oldLayout.yaxis && oldLayout.xaxis.range && oldLayout.yaxis.range) {
       layout.xaxis.range = oldLayout.xaxis.range
       layout.yaxis.range = oldLayout.yaxis.range
@@ -334,12 +391,11 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
   }
 
   drawPlot() {
-    const s = this.cfg.settings;
     const options = {
       showLink: false,
       displaylogo: false,
       // scrollZoom: true,
-      displayModeBar: s.displayModeBar,
+      displayModeBar: this.cfg.settings.displayModeBar,
       modeBarButtonsToRemove: ['sendDataToCloud', 'lasso2d'], //, 'select2d', 'pan2d']
     };
 
@@ -371,7 +427,7 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
     }
 
     if (!this.initialized) {
-      
+
       // only for 'scattermapbox' graph type
       // function to:
       // - display selected bar trace and corresponding map trace
@@ -383,9 +439,9 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
         })
 
         this.newTraces[selectedTraceNumber].visible = 'true';
-        this.newTraces[selectedTraceNumber + this.newTracesMapFirstNumber].visible = 'true';        
+        this.newTraces[selectedTraceNumber + this.newTracesMapFirstNumber].visible = 'true';
         this.yAxisTitleForScatterMapBox = this.cfg.queriesDescription[selectedTraceNumber].yaxistext;
-        
+
         this.drawPlot();
       }
 
@@ -570,16 +626,21 @@ class PlotlyPanelCtrl extends MetricsPanelCtrl {
 
   onDataReceived(dataList) {
     this.dataWarnings = [];
+    this.newTraces = []
 
     if (!dataList || dataList.length < 1) {
       if (this.debug) { console.log('data is empty:', dataList); }
+      this.drawPlot();
       return;
     }
 
     if (!this.cfg.queriesDescription || this.cfg.queriesDescription.length < 1) {
       if (this.debug) { console.log('queries discriptions are missing') }
+      this.drawPlot();
       return;
     }
+
+    this.dashboardVariablesUpdate();
 
     if (this.debug) {
       console.log('data received: dataList', dataList)

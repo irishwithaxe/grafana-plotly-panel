@@ -133,11 +133,11 @@ export class dataTransformator {
             });
         }
 
-        let len = mapPoints.size
+        let pointsCount = mapPoints.size
 
-        let lat: number[] = new Array<number>(len);
-        let lon: number[] = new Array<number>(len);
-        let data: number[] = new Array<number>(len);
+        let lat: number[] = new Array<number>(pointsCount);
+        let lon: number[] = new Array<number>(pointsCount);
+        let data: number[] = new Array<number>(pointsCount);
 
         var index = 0
         mapPoints.forEach(point => {
@@ -160,11 +160,11 @@ export class dataTransformator {
             }
         });
 
-        len = maxHour + 1
-        let X: number[] = new Array<number>(len).map(() => 0)
-        let Y: number[] = new Array<number>(len).map(() => 0)
-        let opacity: number[] = new Array<number>(len).map(() => 0)
-        for (var i = 0; i < len; i++) {
+        let hoursCount = maxHour + 1
+        let X: number[] = new Array<number>(hoursCount).map(() => 0)
+        let Y: number[] = new Array<number>(hoursCount).map(() => 0)
+        let opacity: number[] = new Array<number>(hoursCount).map(() => 0)
+        for (var i = 0; i < hoursCount; i++) {
             X[i] = i
             Y[i] = 0
             opacity[i] = 1
@@ -173,7 +173,7 @@ export class dataTransformator {
         graphPoints.forEach((pointVal, pointKey) => {
             if (!xValueFilter(pointKey)) {
                 opacity[pointKey] = 0.4
-            }6
+            }
             Y[pointKey] = pointVal
         })
 
@@ -185,6 +185,7 @@ export class dataTransformator {
             text: Y,
         }
 
+
         let normalizedData = dataTransformator.normalize(data, 20, 50)
         let mapTrace = {
             type: 'scattermapbox',
@@ -192,7 +193,7 @@ export class dataTransformator {
             lat: lat,
             opacity: 0.6,
             marker: { size: normalizedData },
-            text: data,
+            text: data
         }
 
         return Object({

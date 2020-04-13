@@ -62,6 +62,12 @@ export class defaultValues {
                 fill: 'None',
                 mode: 'None',
                 displayModeBar: true,
+                map: {
+                    latMin: "lat_min",
+                    latMax: "lat_max", 
+                    lonMin: "lon_min",
+                    lonMax: "lon_max"
+                },
             },
             // dataColumnNames: {
             //     dataColumn: '',
